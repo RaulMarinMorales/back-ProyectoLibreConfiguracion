@@ -1,84 +1,96 @@
 const express = require('express');
-const cors = require('cors');  // Importamos el paquete CORS
+const cors = require('cors');
 const app = express();
 const port = 3000;
-const db = require('./db');  // Importamos la conexión a la base de datos
+const db = require('./db');
 require('dotenv').config();
 
-// Middleware para habilitar CORS
-app.use(cors());  // Esto habilita CORS para todas las rutas de tu servidor
-
-// Middleware para log de las solicitudes
-app.use((req, res, next) => {
-  console.log(`Solicitud recibida: ${req.method} ${req.url}`);
-  console.log('Cuerpo:', req.body);
-  next();
-});
-
-// Middleware para parsear JSON
+app.use(cors());
 app.use(express.json());
 
-// Ruta para registrar un equipo
+// Crear un nuevo equipo
 app.post('/equipo', (req, res) => {
   const { nombre, entrenador, email, telefono, categoria, jugadores } = req.body;
 
-  // Validar que los campos requeridos están presentes
-  if (!nombre || !entrenador || !email || !telefono || !categoria || !jugadores || jugadores.length === 0) {
-    return res.status(400).json({ error: 'Todos los campos son obligatorios, incluyendo jugadores' });
-  }
-
-  // Convertimos la lista de jugadores a un formato JSON
-  const jugadoresJSON = JSON.stringify(jugadores);
-
-  // SQL para insertar un nuevo equipo
+  // Insertar el equipo en la tabla equipos_futbol
   const query = 'INSERT INTO equipos_futbol (nombre, entrenador, email, telefono, categoria, jugadores) VALUES (?, ?, ?, ?, ?, ?)';
-  const values = [nombre, entrenador, email, telefono, categoria, jugadoresJSON];
+  const values = [nombre, entrenador, email, telefono, categoria, JSON.stringify(jugadores)]; // Convertir la lista de jugadores a JSON
 
-  // Ejecutamos la consulta para registrar el equipo
   db.query(query, values, (err, result) => {
     if (err) {
-      console.error('Error al registrar el equipo:', err);
-      return res.status(500).json({ error: 'Error al registrar el equipo' });
+      console.error('Error al crear equipo:', err);
+      return res.status(500).json({ error: 'Error al crear equipo' });
     }
-
-    return res.status(201).json({ message: 'Equipo registrado correctamente', equipoId: result.insertId });
+    res.status(201).json({
+      message: 'Equipo creado correctamente',
+      id: result.insertId
+    });
   });
 });
 
-// Ruta para obtener todos los equipos
+// Obtener todos los equipos
 app.get('/equipos', (req, res) => {
   const query = 'SELECT * FROM equipos_futbol';
-
   db.query(query, (err, results) => {
     if (err) {
       console.error('Error al obtener equipos:', err);
       return res.status(500).json({ error: 'Error al obtener equipos' });
     }
-    return res.status(200).json(results);
+    res.status(200).json(results);
   });
 });
 
-// Ruta para obtener los jugadores de un equipo
-app.get('/equipo/:id/jugadores', (req, res) => {
+// Obtener un equipo por su ID
+app.get('/equipo/:id', (req, res) => {
   const equipoId = req.params.id;
-  const query = 'SELECT jugadores FROM equipos_futbol WHERE id = ?';
-
+  const query = 'SELECT * FROM equipos_futbol WHERE id = ?';
   db.query(query, [equipoId], (err, results) => {
     if (err) {
-      console.error('Error al obtener jugadores:', err);
-      return res.status(500).json({ error: 'Error al obtener jugadores' });
+      console.error('Error al obtener equipo:', err);
+      return res.status(500).json({ error: 'Error al obtener equipo' });
     }
 
-    if (results.length > 0) {
-      const jugadores = JSON.parse(results[0].jugadores);
-      return res.status(200).json(jugadores);
-    } else {
+    // Si no se encuentra el equipo
+    if (results.length === 0) {
       return res.status(404).json({ error: 'Equipo no encontrado' });
     }
+
+    // Parsear la columna jugadores de JSON a un array
+    results[0].jugadores = JSON.parse(results[0].jugadores);
+    res.status(200).json(results[0]);
   });
 });
 
-// Arrancar el servidor
+// Eliminar un equipo
+app.delete('/equipo/:id', (req, res) => {
+  const equipoId = req.params.id;
+  const query = 'DELETE FROM equipos_futbol WHERE id = ?';
+  db.query(query, [equipoId], (err, result) => {
+    if (err) {
+      console.error('Error al eliminar equipo:', err);
+      return res.status(500).json({ error: 'Error al eliminar equipo' });
+    }
+    res.status(200).json({ message: 'Equipo eliminado correctamente' });
+  });
+});
+
+// Editar un equipo
+app.put('/equipo/:id', (req, res) => {
+  const equipoId = req.params.id;
+  const { nombre, entrenador, email, telefono, categoria, jugadores } = req.body;
+
+  const query = 'UPDATE equipos_futbol SET nombre = ?, entrenador = ?, email = ?, telefono = ?, categoria = ?, jugadores = ? WHERE id = ?';
+  const values = [nombre, entrenador, email, telefono, categoria, JSON.stringify(jugadores), equipoId];
+
+  db.query(query, values, (err, result) => {
+    if (err) {
+      console.error('Error al editar equipo:', err);
+      return res.status(500).json({ error: 'Error al editar equipo' });
+    }
+    res.status(200).json({ message: 'Equipo actualizado correctamente' });
+  });
+});
+
 app.listen(port, () => {
   console.log(`Servidor corriendo en http://localhost:${port}`);
 });
