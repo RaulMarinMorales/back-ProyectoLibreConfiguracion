@@ -8,9 +8,21 @@ require('dotenv').config();
 app.use(cors());
 app.use(express.json());
 
+// Validación simple de datos
+function validarDatosEquipo(equipo) {
+  if (!equipo.nombre || !equipo.entrenador || !equipo.email || !equipo.telefono || !equipo.categoria || !Array.isArray(equipo.jugadores)) {
+    return false;
+  }
+  return true;
+}
+
 // Crear un nuevo equipo
 app.post('/equipo', (req, res) => {
   const { nombre, entrenador, email, telefono, categoria, jugadores } = req.body;
+
+  if (!validarDatosEquipo(req.body)) {
+    return res.status(400).json({ error: 'Datos del equipo incompletos o inválidos' });
+  }
 
   // Insertar el equipo en la tabla equipos_futbol
   const query = 'INSERT INTO equipos_futbol (nombre, entrenador, email, telefono, categoria, jugadores) VALUES (?, ?, ?, ?, ?, ?)';
@@ -79,6 +91,10 @@ app.put('/equipo/:id', (req, res) => {
   const equipoId = req.params.id;
   const { nombre, entrenador, email, telefono, categoria, jugadores } = req.body;
 
+  if (!validarDatosEquipo(req.body)) {
+    return res.status(400).json({ error: 'Datos del equipo incompletos o inválidos' });
+  }
+
   const query = 'UPDATE equipos_futbol SET nombre = ?, entrenador = ?, email = ?, telefono = ?, categoria = ?, jugadores = ? WHERE id = ?';
   const values = [nombre, entrenador, email, telefono, categoria, JSON.stringify(jugadores), equipoId];
 
@@ -89,6 +105,11 @@ app.put('/equipo/:id', (req, res) => {
     }
     res.status(200).json({ message: 'Equipo actualizado correctamente' });
   });
+});
+
+// Ruta para comprobar la conexión al servidor
+app.get('/status', (req, res) => {
+  res.status(200).json({ message: 'Servidor en funcionamiento' });
 });
 
 app.listen(port, () => {
